@@ -38,9 +38,6 @@ def root():
     if os.geteuid() != 0:
         print(bcolors.WARNING + "Para ejecutar este script son necesarios los permisos de superusuario o 'root'!" + bcolors.ENDC)
         exit(1)
-    else:
-        x = 1
-    return x
 
 # ! prerequisitos() comprueba que el paquete de Linux DHCP-server está instalado
 def prerequisitos_dhcp():
@@ -48,8 +45,8 @@ def prerequisitos_dhcp():
     if "isc-dhcp-server" not in control:
         print(bcolors.BOLD+"Tu equipo no cuenta con el paquete de Linux - 'isc-dhcp-server' - "
               "\nEl paquete se está instalando automáticamente..."+bcolors.ENDC)
-        os.popen('apt install isc-dhcp-server')
-        print(bcolors.OKGREEN+"\nPaquete instalado con éxito!\n"+bcolors.ENDC)
+        os.popen('sudo apt install isc-dhcp-server')
+        print(bcolors.OKGREEN+"Paquete instalado con éxito!\n"+bcolors.ENDC)
     else:
         print(bcolors.OKGREEN+"Tu equipo contiene los paquetes necesarios para que el script funcione!\n"+bcolors.ENDC)
 
@@ -63,7 +60,8 @@ def prerequisitos_sockets():
     if c > 2:
         print("Interfaces de red en orden!")
     else:
-        print(bcolors.WARNING+"Para lanzar este script es necesario tener dos interfaces de red activas!!".bcolors.ENDC)
+        print(bcolors.FAIL+"Para lanzar este script es necesario tener dos interfaces de red activas!!"+bcolors.ENDC)
+        exit(1)
     # Saber si hay dos sockets activos:
     # Socket DHCP ==> Red Interna, guardar su IP y su nombre en una variable
     # Socket salida INTERNET ==> NAT, guardar su IP y su nombre en una variable
@@ -77,15 +75,34 @@ def overw(fil,word,wrx,adds):
     file = open(fil, wrx)
     for i in word:
         file.write(i + adds)
+    file.close()
 
 # ! __MAIN__() función principal del script
 def __MAIN__():
-    if root()==1:
-        prerequisitos_dhcp()
-        overw("/etc/netplan/01-network-manager-all.yaml",netmanager,"w+","\n")
-    else:
-        print(bcolors.HEADER+"Este script ha de ser ejecutado como administrador!!"+bcolors.ENDC)
+    root()
+    print("Comprobando requisitos previos...")
+    prerequisitos_dhcp()
+    print("Comprando interfaces de red...")
+    prerequisitos_sockets()
+    print("Configurando archivos de servidor...")
+    overw("/etc/netplan/01-network-manager-all.yaml",netmanager,"w+","\n")
 
+# Formato de configuración de la interfaz de red DHCP
+netmanager = [
+    "# Let NetworkManager manage all devices on this system",
+    "network:",
+    " ethernets:",
+    "  enp0s8:",
+    "   dhcp4: false",
+    "   addresses: [10.0.0.30/24]",
+    "   nameservers:",
+    "	addresses: [8.8.8.8,8.8.4.4]",
+    "  routes:",
+    "	- to: default",
+    "  	via: 10.0.2.2",
+    " version: 2",
+    " renderer: NetworkManager"
+]
 # Formato de archivo para la configuración del socket DHCP
 # !!!
 # Falta saber como encontrar el nombre del scoket (Ej: enp0s8)
