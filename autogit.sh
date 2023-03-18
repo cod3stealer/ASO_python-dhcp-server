@@ -1,5 +1,7 @@
 #!/bin/bash
 
+git branch
+
 git config  --global user.email "sromerodiaz@dnaielcastelao.org"
 git config  --global user.name "cod3stealer"
 
