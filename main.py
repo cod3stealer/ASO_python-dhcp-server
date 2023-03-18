@@ -53,6 +53,7 @@ def prerequisitos_dhcp():
     else:
         print(bcolors.OKGREEN+"Tu equipo contiene los paquetes necesarios para que el script funcione!\n"+bcolors.ENDC)
 
+# ! prerequisitos_sockets() comprueba si existen las interfaces de red y si estas están activas
 def prerequisitos_sockets():
     algo = os.popen('ip a | cut -d" " -f2 | grep -v -e "^[[:space:]]*$"').read()
     algo = algo.replace(':', '')
@@ -60,7 +61,9 @@ def prerequisitos_sockets():
     for i in algo.splitlines():
         c += 1
     if c > 2:
-        print("Sockets activos correctamente")
+        print("Interfaces de red en orden!")
+    else:
+        print(bcolors.WARNING+"Para lanzar este script es necesario tener dos interfaces de red activas!!".bcolors.ENDC)
     # Saber si hay dos sockets activos:
     # Socket DHCP ==> Red Interna, guardar su IP y su nombre en una variable
     # Socket salida INTERNET ==> NAT, guardar su IP y su nombre en una variable
@@ -88,21 +91,7 @@ def __MAIN__():
 # Falta saber como encontrar el nombre del scoket (Ej: enp0s8)
 # Falta saber como encontrar la IP del que ejecuta el script (Pos. solución: ip -a | filtrar salida por columnas)
 # !!!
-netmanager = [
-    "# Let NetworkManager manage all devices on this system",
-    "network:",
-    " ethernets:",
-    "  enp0s8:",
-    "   dhcp4: false",
-    "   addresses: [10.0.0.30/24]",
-    "   nameservers:",
-    "	addresses: [8.8.8.8,8.8.4.4]",
-    "  routes:",
-    "	- to: default",
-    "  	via: 10.0.2.2",
-    " version: 2",
-    " renderer: NetworkManager"
-]
+
 
 __MAIN__()
 
