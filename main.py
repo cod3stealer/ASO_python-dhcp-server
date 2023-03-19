@@ -15,9 +15,6 @@ Progresión del programa:
 > Falta guardar en una variable la IP del que ejecuta el script
 > y como averiguar el nombre del socket que funcionará 
 > como socket DHCP
-
-- 
-
 """
 # Class con diferentes estilos para los diferentes outputs.
 class bcolors:
@@ -45,20 +42,27 @@ def prerequisitos_dhcp():
     if "isc-dhcp-server" not in control:
         print(bcolors.BOLD+"Tu equipo no cuenta con el paquete de Linux - 'isc-dhcp-server' - "
               "\nEl paquete se está instalando automáticamente..."+bcolors.ENDC)
-        os.popen('sudo apt install isc-dhcp-server')
+        os.popen('sudo apt-get install isc-dhcp-server')
         print(bcolors.OKGREEN+"Paquete instalado con éxito!\n"+bcolors.ENDC)
     else:
         print(bcolors.OKGREEN+"Tu equipo contiene los paquetes necesarios para que el script funcione!\n"+bcolors.ENDC)
 
 # ! prerequisitos_sockets() comprueba si existen las interfaces de red y si estas están activas
 def prerequisitos_sockets():
-    algo = os.popen('ip a | cut -d" " -f2 | grep -v -e "^[[:space:]]*$"').read()
-    algo = algo.replace(':', '')
+    interfaz = os.popen('nmcli dev | grep -w "conectado\|connected" | cut -d" " -f1').read()
     c = 0
-    for i in algo.splitlines():
+    for _ in interfaz.splitlines():
         c += 1
-    if c > 2:
-        print("Interfaces de red en orden!")
+    if c > 1:
+        print("Interfaces de red en orden!" + bcolors.HEADER + "\nEstas son tus interfaces activas: " + bcolors.ENDC)
+        print(interfaz)
+        con = 0
+        while con == 0:
+            inet = input("Selecciona una de las interfaces anteriores escribiendo el nombre EXACTO de una de ellas: ")
+            for i in interfaz.splitlines():
+                if inet == i:
+                    con = 1
+
     else:
         print(bcolors.FAIL+"Para lanzar este script es necesario tener dos interfaces de red activas!!"+bcolors.ENDC)
         exit(1)
@@ -66,6 +70,10 @@ def prerequisitos_sockets():
     # Socket DHCP ==> Red Interna, guardar su IP y su nombre en una variable
     # Socket salida INTERNET ==> NAT, guardar su IP y su nombre en una variable
 
+def set_inetv4(x):
+    interfaz = x
+    with open('/home/saitama/prueba.txt', 'w', encoding='utf-8') as file:
+        file.write('INTERFACESv4="' + interfaz + '"\nINTERFACESv6=""\n')
 # ! overw() sobreescribe ficheros:
 # fil = ruta del fichero
 # word = cadenas de texto
@@ -85,7 +93,21 @@ def __MAIN__():
     print("Comprando interfaces de red...")
     prerequisitos_sockets()
     print("Configurando archivos de servidor...")
+    print("DHCPD.CONF")
+    overw("/etc/dhcp/dhcpd.conf",dhcpdCONF,"a+","\n")
+    set_inetv4(interfaz)
     overw("/etc/netplan/01-network-manager-all.yaml",netmanager,"w+","\n")
+
+# Declaración subnet / máscara / rango IPs / routerDHCP...
+dhcpdCONF = [
+    "subnet 192.168.1.0 netmask 255.255.255.0 {",
+    " range 192.168.1.50 192.168.1.100;",
+    " option routers 192.168.1.1;",
+    " option domain-name-servers 8.8.8.8, 8.8.4.4;",
+    " default-lease-time 600;",
+    " max-lease-time 7200;",
+    "}"
+]
 
 # Formato de configuración de la interfaz de red DHCP
 netmanager = [
