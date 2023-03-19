@@ -17,15 +17,13 @@ if c > 1:
     print("Interfaces de red en orden!"+bcolors.HEADER+"\nEstas son tus interfaces activas: "+bcolors.ENDC)
     for i in interfaz.splitlines():
         print("\/ " + i + " \/" + os.popen('ifconfig | grep "'+i+'" -A 1 | cut -d" " -f10').read())
-    inet = input(bcolors.HEADER + "Selecciona una de las interfaces anteriores para\n"
+    print(bcolors.HEADER + "Selecciona una de las interfaces anteriores para\n"
                            "que sea el encargado de dar IPs a los demás clientes\n"
-                           "escribiendo el nombre EXACTO de una de ellas: " + bcolors.ENDC)
+                           "escribiendo el nombre EXACTO de una de ellas" + bcolors.ENDC)
     con=0
     while con == 0:
+        inet = input("=> ")
         for i in interfaz.splitlines():
             if inet == i:
                 con=1
-        inet = input("Error, el nombre NO coincide, vuelve a intentarlo: ")
-
-interfaz1="enp0s3"
-print(os.popen('ifconfig | grep '+interfaz1+' -A 1 | cut -d" " -f10').read())
+    print("Has seleccionado como interfaz de red DHCP:\n"+bcolors.HEADER+inet+bcolors.ENDC+"\nCon IP"+bcolors.HEADER+os.popen('ifconfig | grep '+inet+' -A 1 | cut -d" " -f10').read()+bcolors.ENDC)

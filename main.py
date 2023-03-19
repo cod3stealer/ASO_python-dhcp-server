@@ -55,14 +55,20 @@ def prerequisitos_sockets():
         c += 1
     if c > 1:
         print("Interfaces de red en orden!" + bcolors.HEADER + "\nEstas son tus interfaces activas: " + bcolors.ENDC)
-        print(interfaz)
+        for i in interfaz.splitlines():
+            print("\/ " + i + " \/" + os.popen('ifconfig | grep "' + i + '" -A 1 | cut -d" " -f10').read())
+        print(bcolors.HEADER + "Selecciona una de las interfaces anteriores para\n"
+                               "que sea el encargado de dar IPs a los demás clientes\n"
+                               "escribiendo el nombre EXACTO de una de ellas" + bcolors.ENDC)
         con = 0
         while con == 0:
-            inet = input("Selecciona una de las interfaces anteriores escribiendo el nombre EXACTO de una de ellas: ")
+            inet_dhcp = input("=> ")
             for i in interfaz.splitlines():
-                if inet == i:
+                if inet_dhcp == i:
                     con = 1
-
+        print("Has seleccionado como interfaz de red DHCP:\n" + bcolors.HEADER + inet_dhcp + bcolors.ENDC + "\nCon IP" + bcolors.HEADER + os.popen(
+                'ifconfig | grep ' + inet_dhcp + ' -A 1 | cut -d" " -f10').read() + bcolors.ENDC)
+        return inet_dhcp
     else:
         print(bcolors.FAIL+"Para lanzar este script es necesario tener dos interfaces de red activas!!"+bcolors.ENDC)
         exit(1)
@@ -70,10 +76,25 @@ def prerequisitos_sockets():
     # Socket DHCP ==> Red Interna, guardar su IP y su nombre en una variable
     # Socket salida INTERNET ==> NAT, guardar su IP y su nombre en una variable
 
-def set_inetv4(x):
-    interfaz = x
+# ! set_inetv4() establece la interfaz que dará IPs
+def set_inetv4(interfaz):
+    print("Configurando archivos de servidor...")
     with open('/home/saitama/prueba.txt', 'w', encoding='utf-8') as file:
-        file.write('INTERFACESv4="' + interfaz + '"\nINTERFACESv6=""\n')
+        file.write('INTERFACESv4="' + interfaz + '"\nINTERFACESv6=""')
+
+def set_dhcp_conf():
+    # Declaración subnet / máscara / rango IPs / routerDHCP...
+    dhcpdCONF = [
+        "subnet 192.168.1.0 netmask 255.255.255.0 {",
+        " range 192.168.1.50 192.168.1.100;",
+        " option routers 192.168.1.1;",
+        " option domain-name-servers 8.8.8.8, 8.8.4.4;",
+        " default-lease-time 600;",
+        " max-lease-time 7200;",
+        "}"
+    ]
+    overw("/etc/dhcp/dhcpd.conf", dhcpdCONF, "a+", "\n")
+
 # ! overw() sobreescribe ficheros:
 # fil = ruta del fichero
 # word = cadenas de texto
@@ -91,23 +112,9 @@ def __MAIN__():
     print("Comprobando requisitos previos...")
     prerequisitos_dhcp()
     print("Comprando interfaces de red...")
-    prerequisitos_sockets()
-    print("Configurando archivos de servidor...")
-    print("DHCPD.CONF")
-    overw("/etc/dhcp/dhcpd.conf",dhcpdCONF,"a+","\n")
-    set_inetv4(interfaz)
+    set_inetv4(prerequisitos_sockets())
+    set_dhcp_conf()
     overw("/etc/netplan/01-network-manager-all.yaml",netmanager,"w+","\n")
-
-# Declaración subnet / máscara / rango IPs / routerDHCP...
-dhcpdCONF = [
-    "subnet 192.168.1.0 netmask 255.255.255.0 {",
-    " range 192.168.1.50 192.168.1.100;",
-    " option routers 192.168.1.1;",
-    " option domain-name-servers 8.8.8.8, 8.8.4.4;",
-    " default-lease-time 600;",
-    " max-lease-time 7200;",
-    "}"
-]
 
 # Formato de configuración de la interfaz de red DHCP
 netmanager = [
