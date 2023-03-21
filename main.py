@@ -1,5 +1,7 @@
 # Import de librerias
 import os
+import subprocess
+import re
 """
 Progresión del programa:
 
@@ -79,22 +81,47 @@ def prerequisitos_sockets():
 # ! set_inetv4() establece la interfaz que dará IPs
 def set_inetv4(interfaz):
     print("Configurando archivos de servidor...")
-    with open('/home/saitama/prueba.txt', 'w', encoding='utf-8') as file:
+    with open('/etc/default/isc-dhcp-server', 'w', encoding='utf-8') as file:
         file.write('INTERFACESv4="' + interfaz + '"\nINTERFACESv6=""')
 
-def set_dhcp_conf():
-    # Declaración subnet / máscara / rango IPs / routerDHCP...
-    dhcpdCONF = [
-        "subnet 192.168.1.0 netmask 255.255.255.0 {",
-        " range 192.168.1.50 192.168.1.100;",
-        " option routers 192.168.1.1;",
-        " option domain-name-servers 8.8.8.8, 8.8.4.4;",
-        " default-lease-time 600;",
-        " max-lease-time 7200;",
-        "}"
-    ]
-    overw("/etc/dhcp/dhcpd.conf", dhcpdCONF, "a+", "\n")
+def set_dhcp_conf(IP):
+    sub=get_subnet(IP)
+    sub+="0"
+    subnet = sub
+    sub-="0"
+    netmask = "255.255.255.0"
+    sub+="2"
+    range_start = sub
+    sub-="2"
+    sub+="253"
+    range_end = sub
+    sub-="253"
+    sub+="1"
+    gateway = sub
+    dns_servers = ["8.8.8.8", "8.8.4.4"]
+    default-lease-time="600"
+    max-lease-time="7200"
 
+    subprocess.run(["sudo", "cp", "/etc/dhcp/dhcpd.conf", "/etc/dhcp/dhcpd.conf.bak"])
+
+    with open("/etc/dhcp/dhcpd.conf", "w") as f:
+        f.write("authoritative;")
+        f.write("subnet {} netmask {} {\n".format(subnet, netmask))
+        f.write("range {} {};\n".format(range_start, range_end))
+        f.write("option routers {};\n".format(gateway))
+        f.write("option domain-name-servers {};\n".format(", ".join(dns_servers)))
+        f.write("default-lease-time {};\n".format(default-lease-time))
+        f.write("max-lease-time {};\n}".format(max - lease - time))
+    os.chmod("/etc/dhcp/dhcpd.conf", 0o644)
+
+def get_subnet(ip):
+    subnet_regex = re.compile(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.')
+    subnet_match = subnet_regex.match(ip)
+    subnet = subnet_match.group() if subnet_match else None
+    return subnet
+
+def allow_ufw():
+    os.popen('sudo ufw allow  67/udp').read()
 # ! overw() sobreescribe ficheros:
 # fil = ruta del fichero
 # word = cadenas de texto
@@ -112,8 +139,10 @@ def __MAIN__():
     print("Comprobando requisitos previos...")
     prerequisitos_dhcp()
     print("Comprando interfaces de red...")
-    set_inetv4(prerequisitos_sockets())
-    set_dhcp_conf()
+    inet_dhcp = prerequisitos_sockets()
+    IP = os.popen('ifconfig | grep ' + inet_dhcp + ' -A 1 | cut -d" " -f10').read()
+    set_inetv4(inet_dhcp)
+    set_dhcp_conf(IP)
     overw("/etc/netplan/01-network-manager-all.yaml",netmanager,"w+","\n")
 
 # Formato de configuración de la interfaz de red DHCP
@@ -121,9 +150,9 @@ netmanager = [
     "# Let NetworkManager manage all devices on this system",
     "network:",
     " ethernets:",
-    "  enp0s8:",
+    "  "+inet_dhcp+":",
     "   dhcp4: false",
-    "   addresses: [10.0.0.30/24]",
+    "   addresses: ["+IP+"/24]",
     "   nameservers:",
     "	addresses: [8.8.8.8,8.8.4.4]",
     "  routes:",
@@ -132,12 +161,6 @@ netmanager = [
     " version: 2",
     " renderer: NetworkManager"
 ]
-# Formato de archivo para la configuración del socket DHCP
-# !!!
-# Falta saber como encontrar el nombre del scoket (Ej: enp0s8)
-# Falta saber como encontrar la IP del que ejecuta el script (Pos. solución: ip -a | filtrar salida por columnas)
-# !!!
-
 
 __MAIN__()
 
