@@ -1,7 +1,8 @@
 # Import de librerias
 import os
-import subprocess
 import re
+import subprocess
+
 """
 Progresión del programa:
 
@@ -44,7 +45,7 @@ def prerequisitos_dhcp():
     if "isc-dhcp-server" not in control:
         print(bcolors.BOLD+"Tu equipo no cuenta con el paquete de Linux - 'isc-dhcp-server' - "
               "\nEl paquete se está instalando automáticamente..."+bcolors.ENDC)
-        os.popen('sudo apt-get install isc-dhcp-server')
+        os.popen('sudo apt-get install isc-dhcp-server -y')
         print(bcolors.OKGREEN+"Paquete instalado con éxito!\n"+bcolors.ENDC)
     else:
         print(bcolors.OKGREEN+"Tu equipo contiene los paquetes necesarios para que el script funcione!\n"+bcolors.ENDC)
@@ -70,7 +71,22 @@ def prerequisitos_sockets():
                     con = 1
         print("Has seleccionado como interfaz de red DHCP:\n" + bcolors.HEADER + inet_dhcp + bcolors.ENDC + "\nCon IP" + bcolors.HEADER + os.popen(
                 'ifconfig | grep ' + inet_dhcp + ' -A 1 | cut -d" " -f10').read() + bcolors.ENDC)
-        return inet_dhcp
+
+        for i in interfaz.splitlines():
+            print("\/ " + i + " \/" + os.popen('ifconfig | grep "' + i + '" -A 1 | cut -d" " -f10').read())
+        print(bcolors.HEADER + "Selecciona una de las interfaces anteriores para\n"
+                               "que sea el encargado de dar conectividad a Internet\n"
+                               "a los clientesescribiendo el nombre EXACTO de una de ellas\n"
+                               "AVISO: no se podrá seleccionar la misma interfaz que la anterior!" + bcolors.ENDC)
+        con = 0
+        while con == 0:
+            inet_internet = input("=> ")
+            for i in interfaz.splitlines():
+                if inet_internet == i and inet_internet != inet_dhcp:
+                    con = 1
+        print("Has seleccionado como interfaz de red:\n" + bcolors.HEADER + inet_internet + bcolors.ENDC + "\nCon IP" + bcolors.HEADER + os.popen(
+                'ifconfig | grep ' + inet_internet + ' -A 1 | cut -d" " -f10').read() + bcolors.ENDC)
+        return inet_dhcp,inet_internet
     else:
         print(bcolors.FAIL+"Para lanzar este script es necesario tener dos interfaces de red activas!!"+bcolors.ENDC)
         exit(1)
@@ -86,33 +102,29 @@ def set_inetv4(interfaz):
 
 def set_dhcp_conf(IP):
     sub=get_subnet(IP)
-    sub+="0"
-    subnet = sub
-    sub-="0"
+    subnet = sub + "0"
     netmask = "255.255.255.0"
-    sub+="2"
-    range_start = sub
-    sub-="2"
-    sub+="253"
-    range_end = sub
-    sub-="253"
-    sub+="1"
-    gateway = sub
+    range_start = sub + "2"
+    range_end = sub + "200"
+    gateway =  IP
     dns_servers = ["8.8.8.8", "8.8.4.4"]
-    default-lease-time="600"
-    max-lease-time="7200"
+    default_lease="600"
+    max_time="7200"
 
     subprocess.run(["sudo", "cp", "/etc/dhcp/dhcpd.conf", "/etc/dhcp/dhcpd.conf.bak"])
 
     with open("/etc/dhcp/dhcpd.conf", "w") as f:
+        f.write("default-lease-time {};\n".format(default - lease - time))
+        f.write("max-lease-time {};\n".format(max - lease - time))
         f.write("authoritative;")
         f.write("subnet {} netmask {} {\n".format(subnet, netmask))
         f.write("range {} {};\n".format(range_start, range_end))
         f.write("option routers {};\n".format(gateway))
-        f.write("option domain-name-servers {};\n".format(", ".join(dns_servers)))
-        f.write("default-lease-time {};\n".format(default-lease-time))
-        f.write("max-lease-time {};\n}".format(max - lease - time))
-    os.chmod("/etc/dhcp/dhcpd.conf", 0o644)
+        f.write("option domain-name-servers {};\n}".format(", ".join(dns_servers)))
+
+    os.popen('sudo systemctl start isc-dhcp-server')
+    os.popen('sudo systemctl enable isc-dhcp-server')
+    os.popen('sudo systemctl status isc-dhcp-server')
 
 def get_subnet(ip):
     subnet_regex = re.compile(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.')
@@ -133,34 +145,39 @@ def overw(fil,word,wrx,adds):
         file.write(i + adds)
     file.close()
 
+def set_static_dhcp(net,inet):
+    netmanager = [
+        "# Let NetworkManager manage all devices on this system",
+        "network:",
+        " ethernets:",
+        "  " + inet + ":",
+        "   dhcp4: false",
+        "   addresses: [" + net + "/24]",
+        "   nameservers:",
+        "	addresses: [8.8.8.8,8.8.4.4]",
+        "  routes:",
+        "	- to: default",
+        "  	via: 10.0.2.2",
+        " version: 2",
+        " renderer: NetworkManager"
+    ]
+    overw("/etc/netplan/01-network-manager-all.yaml", netmanager, "w+", "\n")
+
 # ! __MAIN__() función principal del script
 def __MAIN__():
     root()
     print("Comprobando requisitos previos...")
     prerequisitos_dhcp()
     print("Comprando interfaces de red...")
-    inet_dhcp = prerequisitos_sockets()
-    IP = os.popen('ifconfig | grep ' + inet_dhcp + ' -A 1 | cut -d" " -f10').read()
-    set_inetv4(inet_dhcp)
+    inet = prerequisitos_sockets()
+    IP = os.popen('ifconfig | grep ' + inet[0] + ' -A 1 | cut -d" " -f10').read()
+    set_inetv4(inet[0])
+    set_static_dhcp(IP,inet[0,inet[1]])
     set_dhcp_conf(IP)
-    overw("/etc/netplan/01-network-manager-all.yaml",netmanager,"w+","\n")
+
 
 # Formato de configuración de la interfaz de red DHCP
-netmanager = [
-    "# Let NetworkManager manage all devices on this system",
-    "network:",
-    " ethernets:",
-    "  "+inet_dhcp+":",
-    "   dhcp4: false",
-    "   addresses: ["+IP+"/24]",
-    "   nameservers:",
-    "	addresses: [8.8.8.8,8.8.4.4]",
-    "  routes:",
-    "	- to: default",
-    "  	via: 10.0.2.2",
-    " version: 2",
-    " renderer: NetworkManager"
-]
+
 
 __MAIN__()
 
