@@ -2,6 +2,8 @@
 
 git branch
 
+git checkout -b main
+
 git remote -v
 
 git remote add origin https://github.com/cod3stealer/ASO_python-dhcp-server
